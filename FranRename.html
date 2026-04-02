@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>FranRename - Web OCR v3.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        :root { --p: #0078d4; --bg: #f3f3f3; }
+        body { font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; background: var(--bg); margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #fff; padding: 15px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #ddd; }
+        .btn { background: var(--p); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .btn:hover { background: #005a9e; }
+        .btn.red { background: #d83b01; }
+        
+        main { flex: 1; display: flex; overflow: hidden; padding: 20px; gap: 20px; }
+        #canvas-container { flex: 3; background: #ddd; border-radius: 8px; position: relative; display: flex; align-items: center; justify-content: center; overflow: auto; cursor: crosshair; }
+        canvas { box-shadow: 0 5px 20px rgba(0,0,0,0.2); background: white; }
+        
+        #side { flex: 1; background: #fff; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 15px; border: 1px solid #ddd; }
+        .file-list { flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; list-style: none; padding: 0; font-size: 13px; }
+        .file-item { padding: 8px 12px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; }
+        .file-item:hover { background: #f9f9f9; }
+        .file-item.active { background: #e1f0ff; font-weight: bold; }
+        
+        .ocr-res { font-size: 18px; padding: 10px; border: 2px solid var(--p); border-radius: 4px; outline: none; width: 100%; box-sizing: border-box; }
+        .loader { display: none; margin-top: 10px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="font-size: 20px; font-weight: bold;">FranRename <span style="font-size: 12px; color: #666;">v3.0 Web Alpha</span></div>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn" onclick="openFolder()">📁 폴더 선택 (사진 위치)</button>
+    </div>
+</header>
+
+<main>
+    <div id="canvas-container">
+        <canvas id="cvs"></canvas>
+        <div id="drag-hint" style="position: absolute; pointer-events: none; color: #fff; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px;">보드판 영역을 마우스로 드래그하세요</div>
+    </div>
+    
+    <div id="side">
+        <div style="font-weight: bold;">파일 리스트</div>
+        <ul id="list" class="file-list"></ul>
+        
+        <div style="font-weight: bold; margin-top: 10px;">인식 결과 (직접 수정 가능)</div>
+        <input type="text" id="ocrInput" class="ocr-res" placeholder="이름을 선택하세요...">
+        <div id="status" class="loader">텍스트 인식 중...</div>
+        
+        <button class="btn" style="width: 100%; height: 50px; font-size: 16px;" onclick="renameActive()">✅ 파일명 변경 (확정)</button>
+    </div>
+</main>
+
+<script>
+    let dirHandle, activeFile, activeImg;
+    const canvas = document.getElementById('cvs');
+    const ctx = canvas.getContext('2d');
+    let startX, startY, isDragging = false;
+    let files = [];
+
+    async function openFolder() {
+        try {
+            dirHandle = await window.showDirectoryPicker();
+            files = [];
+            const list = document.getElementById('list');
+            list.innerHTML = "";
+            
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === 'file' && /\.(jpg|jpeg|png|webp)$/i.test(entry.name)) {
+                    files.push(entry);
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    li.innerHTML = `<span>${entry.name}</span>`;
+                    li.onclick = () => loadFile(entry, li);
+                    list.appendChild(li);
+                }
+            }
+        } catch (e) { alert("폴더 접근이 거부되었거나 취소되었습니다."); }
+    }
+
+    async function loadFile(entry, li) {
+        document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+        li.classList.add('active');
+        activeFile = entry;
+        
+        const file = await entry.getFile();
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            activeImg = img;
+            const ratio = Math.min(800 / img.width, 600 / img.height);
+            canvas.width = img.width * ratio;
+            canvas.height = img.height * ratio;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            document.getElementById('drag-hint').style.display = 'none';
+        };
+        img.src = url;
+    }
+
+    canvas.onmousedown = (e) => { 
+        if(!activeImg) return;
+        startX = e.offsetX; startY = e.offsetY; isDragging = true; 
+    };
+
+    canvas.onmousemove = (e) => {
+        if(!isDragging) return;
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        ctx.drawImage(activeImg, 0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(startX, startY, e.offsetX - startX, e.offsetY - startY);
+    };
+
+    canvas.onmouseup = async (e) => {
+        if(!isDragging) return;
+        isDragging = false;
+        const endX = e.offsetX, endY = e.offsetY;
+        
+        // Crop and OCR
+        const sX = Math.min(startX, endX), sY = Math.min(startY, endY);
+        const w = Math.abs(endX - startX), h = Math.abs(endY - startY);
+        if(w < 5 || h < 5) return;
+
+        const tempCvs = document.createElement('canvas');
+        tempCvs.width = w * (activeImg.width / canvas.width);
+        tempCvs.height = h * (activeImg.height / canvas.height);
+        const tCtx = tempCvs.getContext('2d');
+        tCtx.drawImage(activeImg, sX * (activeImg.width/canvas.width), sY * (activeImg.height/canvas.height), w * (activeImg.width/canvas.width), h * (activeImg.height/canvas.height), 0,0, tempCvs.width, tempCvs.height);
+        
+        document.getElementById('status').style.display = 'block';
+        const { data: { text } } = await Tesseract.recognize(tempCvs, 'kor+eng');
+        document.getElementById('status').style.display = 'none';
+        
+        document.getElementById('ocrInput').value = text.replace(/[\/\?%*:|"<>]/g, '').trim();
+    };
+
+    async function renameActive() {
+        const newName = document.getElementById('ocrInput').value;
+        if(!activeFile || !newName) return alert("파일을 선택하고 영역을 드래그하세요!");
+        
+        try {
+            const ext = activeFile.name.split('.').pop();
+            const fullNewName = `${newName}.${ext}`;
+            
+            // Web File System Access API Renaming
+            const newFile = await dirHandle.getFileHandle(fullNewName, { create: true });
+            const writable = await newFile.createWritable();
+            await writable.write(await activeFile.getFile());
+            await writable.close();
+            
+            await dirHandle.removeEntry(activeFile.name);
+            
+            alert(`성공! [${activeFile.name}] -> [${fullNewName}]`);
+            location.reload(); // 단순화를 위해 새로고침
+        } catch (e) { alert("권한 에러: " + e.message); }
+    }
+</script>
+</body>
+</html>

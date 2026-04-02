@@ -1,0 +1,46 @@
+name: Build Windows EXE and Deploy to Telegram
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Build Sidecar
+      run: |
+        pip install pyinstaller easyocr requests pillow
+        pyinstaller --onefile sidecar/main.py --name ocr-engine-x86_64-pc-windows-msvc
+        mkdir src-tauri/bin
+        move dist/ocr-engine-x86_64-pc-windows-msvc.exe src-tauri/bin/
+
+    - name: Build Tauri App
+      run: npm run tauri build
+
+    - name: Send File to Telegram
+      env:
+        TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
+      run: |
+        python scripts/deploy_to_telegram.py

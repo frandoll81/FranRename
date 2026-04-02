@@ -1,0 +1,13 @@
+**/node_modules/
+**/dist/
+**/build/
+**/target/
+**/venv/
+**/.venv/
+*.exe
+*.zip
+.DS_Store
+.gemini/
+build_v81.yml
+ocr-renamer.exe
+src-tauri/bin/
