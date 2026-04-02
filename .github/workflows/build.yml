@@ -15,18 +15,19 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: "24"
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
     - name: Install Dependencies
-      run: npm install
+      run: |
+        npm install --force
 
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: "3.11"
 
     - name: Build Sidecar
       run: |
@@ -36,7 +37,7 @@ jobs:
         move dist/ocr-engine-x86_64-pc-windows-msvc.exe src-tauri/bin/
 
     - name: Build Tauri App
-      run: npm run tauri build
+      run: npm run tauri build -- --verbose
 
     - name: Send File to Telegram
       env:
@@ -44,3 +45,4 @@ jobs:
         USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
       run: |
         python scripts/deploy_to_telegram.py
+# V14.1 Force Refresh 🎯
