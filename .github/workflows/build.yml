@@ -39,12 +39,21 @@ jobs:
     - name: Build Tauri App
       run: |
         if exist src-tauri\bin\ocr-engine-x86_64-pc-windows-msvc.exe (echo Sidecar Found!) else (echo Sidecar MISSING! && exit 1)
-        npm run tauri build -- --verbose
+        npm run tauri build -- --verbose > tauri_build_error.log 2>&1
 
-    - name: Send File to Telegram
+    - name: Send Error Log to Telegram if Failed
+      if: failure()
+      env:
+        TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
+      run: |
+        python scripts/send_log_to_telegram.py
+
+    - name: Send File to Telegram if Success
+      if: success()
       env:
         TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
       run: |
         python scripts/deploy_to_telegram.py
-# V20.1 No Escaping Fix 🎯
+# V21.0 Telegram Log Proxy 🎯
