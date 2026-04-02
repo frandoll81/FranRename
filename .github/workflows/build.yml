@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
     
     steps:
     - name: Checkout Code
@@ -33,8 +36,8 @@ jobs:
       run: |
         pip install pyinstaller easyocr requests pillow
         pyinstaller --onefile sidecar/main.py --name ocr-engine-x86_64-pc-windows-msvc
-        mkdir src-tauri/bin
-        move dist/ocr-engine-x86_64-pc-windows-msvc.exe src-tauri/bin/
+        if not exist src-tauri\bin mkdir src-tauri\bin
+        move dist\ocr-engine-x86_64-pc-windows-msvc.exe src-tauri\bin\
 
     - name: Build Tauri App
       run: |
@@ -46,6 +49,7 @@ jobs:
       env:
         TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
+      shell: bash
       run: |
         python scripts/send_log_to_telegram.py
 
@@ -54,6 +58,7 @@ jobs:
       env:
         TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
+      shell: bash
       run: |
         python scripts/deploy_to_telegram.py
-# V21.0 Telegram Log Proxy 🎯
+# V21.1 Shell Force CMD 🎯
