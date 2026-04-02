@@ -37,7 +37,9 @@ jobs:
         move dist/ocr-engine-x86_64-pc-windows-msvc.exe src-tauri/bin/
 
     - name: Build Tauri App
-      run: npm run tauri build -- --verbose
+      run: |
+        dir /s /b src-tauri/bin
+        npm run tauri build -- --verbose
 
     - name: Send File to Telegram
       env:
@@ -45,4 +47,4 @@ jobs:
         USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
       run: |
         python scripts/deploy_to_telegram.py
-# V14.1 Force Refresh 🎯
+# V15.1 Direct Delivery 🎯
