@@ -38,18 +38,8 @@ jobs:
 
     - name: Build Tauri App
       run: |
-        powershell -Command "if (Test-Path \"src-tauri/bin/ocr-engine-x86_64-pc-windows-msvc.exe\") { echo \"Sidecar Found!\" } else { echo \"Sidecar MISSING!\"; exit 1 }"
-        npm run tauri build -- --verbose > tauri_build_error.log 2>&1
-
-    - name: Commit Error Log if Failed
-      if: failure()
-      run: |
-        git config --local user.email "error@github.com"
-        git config --local user.name "Error Logger"
-        git add tauri_build_error.log
-        git commit -m "DEBUG: Log Build Error"
-        git push origin main
-      continue-on-error: true
+        if exist src-tauri\bin\ocr-engine-x86_64-pc-windows-msvc.exe (echo Sidecar Found!) else (echo Sidecar MISSING! && exit 1)
+        npm run tauri build -- --verbose
 
     - name: Send File to Telegram
       env:
@@ -57,4 +47,4 @@ jobs:
         USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
       run: |
         python scripts/deploy_to_telegram.py
-# V20.0 Error Logan 🎯
+# V20.1 No Escaping Fix 🎯
