@@ -38,7 +38,7 @@ jobs:
 
     - name: Build Tauri App
       run: |
-        dir /s /b src-tauri/bin
+        powershell -Command "if (Test-Path \"src-tauri/bin/ocr-engine-x86_64-pc-windows-msvc.exe\") { echo \"Sidecar Found!\" } else { echo \"Sidecar MISSING!\"; exit 1 }"
         npm run tauri build -- --verbose
 
     - name: Send File to Telegram
@@ -47,4 +47,4 @@ jobs:
         USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
       run: |
         python scripts/deploy_to_telegram.py
-# V15.1 Direct Delivery 🎯
+# V17.1 Strict Detection 🎯
